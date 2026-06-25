@@ -560,6 +560,15 @@ import re
 
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_16h5)
 detector_params = cv2.aruco.DetectorParameters()
+
+detector_params.adaptiveThreshWinSizeMin = 3
+detector_params.adaptiveThreshWinSizeMax = 55
+detector_params.adaptiveThreshWinSizeStep = 4
+detector_params.adaptiveThreshConstant = 7
+detector_params.minMarkerPerimeterRate = 0.02
+detector_params.maxMarkerPerimeterRate = 4.0
+detector_params.polygonalApproxAccuracyRate = 0.05
+
 detector = cv2.aruco.ArucoDetector(aruco_dict, detector_params)
 
 # NOTE: no cv2.VideoCapture here -- this script only ever processes saved
