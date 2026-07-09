@@ -1,15 +1,17 @@
 """
 train_occupancy_model.py
 
-Trains a small CNN to classify a chess-square crop as occupied or empty.
-Reads directly from the dataset/occupied/ and dataset/empty/ folders
-produced by label_squares.py.
+Trains a small CNN to classify a chess-square crop as empty, white
+(occupied by a white piece), or black (occupied by a black piece).
+Reads directly from the dataset/empty/, dataset/white/, and
+dataset/black/ folders produced by label_squares.py.
 
 WHAT THIS SCRIPT DOES, STEP BY STEP:
-  1. Loads all image paths from dataset/{occupied,empty}/, splits them
-     into train/validation sets BY FRAME (not by individual crop --
+  1. Loads all image paths from dataset/{empty,white,black}/, splits
+     them into train/validation sets BY FRAME (not by individual crop --
      see split_by_frame() for why this matters).
-  2. Defines a small CNN (a few conv blocks + a small classifier head).
+  2. Defines a small CNN (a few conv blocks + a small classifier head)
+     with a 3-way softmax output.
   3. Trains for a number of epochs, tracking train/val loss and accuracy.
   4. Saves the best-performing model checkpoint to disk.
   5. Prints a final summary and a couple of misclassified examples so
@@ -44,6 +46,13 @@ IMAGE_SIZE = 64          # crops get resized to this (square) size before going 
 VAL_FRACTION = 0.2       # 20% of frames held out for validation
 SEED = 42
 
+# Class scheme -- must match the folder names label_squares.py writes to,
+# and the index order here defines what the model's logits mean
+# (index 0 = empty, 1 = white, 2 = black). test_occupancy_model.py imports
+# these constants directly so the two scripts can't drift out of sync.
+CLASS_NAMES = ["empty", "white", "black"]
+NUM_CLASSES = len(CLASS_NAMES)
+
 # ----------------------------- DATA -----------------------------
 
 def extract_frame_id(filepath):
@@ -67,9 +76,11 @@ def extract_frame_id(filepath):
     return base
 
 
-def split_by_frame(occupied_paths, empty_paths, val_fraction, seed):
+def split_by_frame(class_paths, val_fraction, seed):
     """
     Splits into train/val BY FRAME, not by individual crop.
+
+    class_paths: dict mapping class_name -> list of file paths.
 
     Why this matters: each frame contributes 64 crops, all sharing the
     same lighting, same camera position, same exact pieces. If you split
@@ -79,7 +90,7 @@ def split_by_frame(occupied_paths, empty_paths, val_fraction, seed):
     how good the model actually is. Splitting whole frames into either
     train or val avoids that leak.
     """
-    all_paths = occupied_paths + empty_paths
+    all_paths = [p for paths in class_paths.values() for p in paths]
     frame_to_paths = defaultdict(list)
     for p in all_paths:
         frame_to_paths[extract_frame_id(p)].append(p)
@@ -104,7 +115,7 @@ def split_by_frame(occupied_paths, empty_paths, val_fraction, seed):
 class SquareDataset(Dataset):
     def __init__(self, paths, labels, transform):
         self.paths = paths
-        self.labels = labels  # 1 = occupied, 0 = empty
+        self.labels = labels  # int class index: 0=empty, 1=white, 2=black
         self.transform = transform
 
     def __len__(self):
@@ -113,29 +124,36 @@ class SquareDataset(Dataset):
     def __getitem__(self, idx):
         img = Image.open(self.paths[idx]).convert("RGB")
         img = self.transform(img)
-        label = torch.tensor(self.labels[idx], dtype=torch.float32)
+        # CrossEntropyLoss expects integer class labels (long), not floats
+        label = torch.tensor(self.labels[idx], dtype=torch.long)
         return img, label
 
 
 def build_datasets():
-    occupied_paths = sorted(glob.glob(os.path.join(DATASET_DIR, "occupied", "*")))
-    empty_paths = sorted(glob.glob(os.path.join(DATASET_DIR, "empty", "*")))
+    class_paths = {
+        name: sorted(glob.glob(os.path.join(DATASET_DIR, name, "*")))
+        for name in CLASS_NAMES
+    }
 
-    if not occupied_paths or not empty_paths:
+    if any(len(paths) == 0 for paths in class_paths.values()):
+        counts_str = ", ".join(f"{name}={len(paths)}" for name, paths in class_paths.items())
         raise RuntimeError(
-            f"Expected images in {DATASET_DIR}/occupied/ and {DATASET_DIR}/empty/, "
-            f"found {len(occupied_paths)} and {len(empty_paths)} respectively. "
+            f"Expected images in dataset/{{{','.join(CLASS_NAMES)}}}/, found: {counts_str}. "
             f"Run label_squares.py first to build the dataset."
         )
 
-    print(f"Found {len(occupied_paths)} occupied crops, {len(empty_paths)} empty crops.")
+    print("Found crops: " + ", ".join(f"{len(paths)} {name}" for name, paths in class_paths.items()))
 
-    train_paths, val_paths = split_by_frame(occupied_paths, empty_paths, VAL_FRACTION, SEED)
+    train_paths, val_paths = split_by_frame(class_paths, VAL_FRACTION, SEED)
 
-    occupied_set = set(occupied_paths)
+    # Map each path back to its class index for label lookup
+    path_to_label = {}
+    for class_idx, name in enumerate(CLASS_NAMES):
+        for p in class_paths[name]:
+            path_to_label[p] = class_idx
 
     def labels_for(paths):
-        return [1 if p in occupied_set else 0 for p in paths]
+        return [path_to_label[p] for p in paths]
 
     train_labels = labels_for(train_paths)
     val_labels = labels_for(val_paths)
@@ -164,13 +182,13 @@ def build_datasets():
 
 class SquareOccupancyCNN(nn.Module):
     """
-    Small CNN for binary occupied/empty classification on a single
+    Small CNN for 3-way empty/white/black classification on a single
     square crop. Deliberately tiny -- this task (well-cropped, top-down,
     fixed-size images) doesn't need a deep network, and a small model
     trains fast and runs all 64 squares in a single batched forward pass
     in milliseconds.
     """
-    def __init__(self):
+    def __init__(self, num_classes=NUM_CLASSES):
         super().__init__()
         self.features = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=3, padding=1),
@@ -190,13 +208,13 @@ class SquareOccupancyCNN(nn.Module):
             nn.Linear(64 * 8 * 8, 64),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(64, 1),
+            nn.Linear(64, num_classes),
         )
 
     def forward(self, x):
         x = self.features(x)
         x = self.classifier(x)
-        return x.squeeze(1)  # raw logits, shape (batch,)
+        return x  # raw logits, shape (batch, num_classes)
 
 
 # ----------------------------- TRAIN / EVAL LOOPS -----------------------------
@@ -220,7 +238,7 @@ def run_epoch(model, loader, criterion, optimizer, device, train):
                 loss.backward()
                 optimizer.step()
 
-            preds = (torch.sigmoid(logits) > 0.5).float()
+            preds = logits.argmax(dim=1)
             total_correct += (preds == labels).sum().item()
             total_count += labels.size(0)
             total_loss += loss.item() * labels.size(0)
@@ -246,7 +264,7 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
     model = SquareOccupancyCNN().to(device)
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     best_val_acc = 0.0
@@ -265,6 +283,7 @@ def main():
                 "model_state_dict": model.state_dict(),
                 "image_size": IMAGE_SIZE,
                 "val_acc": val_acc,
+                "class_names": CLASS_NAMES,
             }, CHECKPOINT_PATH)
             print(f"  -> new best val_acc {val_acc:.4f}, saved to {CHECKPOINT_PATH}")
 
