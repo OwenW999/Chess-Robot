@@ -12,14 +12,16 @@ WHAT THIS SCRIPT DOES, STEP BY STEP:
      see split_by_frame() for why this matters).
   2. Defines a small CNN (a few conv blocks + a small classifier head)
      with a 3-way softmax output.
-  3. Trains for a number of epochs, tracking train/val loss and accuracy.
+  3. Trains for up to --epochs epochs, with a ReduceLROnPlateau
+     scheduler and early stopping, tracking train/val loss and accuracy.
   4. Saves the best-performing model checkpoint to disk.
   5. Prints a final summary and a couple of misclassified examples so
      you can sanity check what's going wrong, if anything.
 
 Run:
   python3 train_occupancy_model.py
-  python3 train_occupancy_model.py --epochs 30 --batch-size 64
+  python3 train_occupancy_model.py --epochs 100 --batch-size 64
+  python3 train_occupancy_model.py --epochs 100 --patience 10
 
 Requires: torch, torchvision, pillow
   pip install torch torchvision pillow
@@ -158,14 +160,18 @@ def build_datasets():
     train_labels = labels_for(train_paths)
     val_labels = labels_for(val_paths)
 
-    # Light augmentation on train only -- small random brightness/contrast
-    # jitter and flips help the model generalize across lighting conditions
-    # without needing even more captured data. No augmentation on val, since
-    # we want validation accuracy to reflect real, unmodified images.
+    # Augmentation on train only. Kept mild and deliberately geometry-light:
+    # these crops are precisely grid-aligned by the vision pipeline, so
+    # aggressive rotation/shear would teach the model to expect misalignment
+    # it will never actually see at inference. Small rotation + small
+    # translation just adds tolerance for imperfect homography/cropping;
+    # color jitter and flips help generalize across lighting/piece orientation.
     train_transform = T.Compose([
         T.Resize((IMAGE_SIZE, IMAGE_SIZE)),
         T.ColorJitter(brightness=0.3, contrast=0.3),
         T.RandomHorizontalFlip(),
+        T.RandomRotation(5),
+        T.RandomAffine(degrees=0, translate=(0.05, 0.05)),
         T.ToTensor(),
     ])
     val_transform = T.Compose([
@@ -187,19 +193,27 @@ class SquareOccupancyCNN(nn.Module):
     fixed-size images) doesn't need a deep network, and a small model
     trains fast and runs all 64 squares in a single batched forward pass
     in milliseconds.
+
+    BatchNorm after each conv stabilizes training enough to tolerate more
+    epochs and a slightly higher effective learning rate without diverging,
+    which is what actually lets longer training help instead of just
+    oscillating around the same accuracy.
     """
     def __init__(self, num_classes=NUM_CLASSES):
         super().__init__()
         self.features = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=3, padding=1),
+            nn.BatchNorm2d(16),
             nn.ReLU(),
             nn.MaxPool2d(2),  # 64 -> 32
 
             nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(2),  # 32 -> 16
 
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(2),  # 16 -> 8
         )
@@ -248,9 +262,12 @@ def run_epoch(model, loader, criterion, optimizer, device, train):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=100,
+                         help="Max epochs. Early stopping will usually halt well before this.")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--patience", type=int, default=8,
+                         help="Stop if val_acc hasn't improved for this many epochs.")
     args = parser.parse_args()
 
     torch.manual_seed(SEED)
@@ -267,27 +284,49 @@ def main():
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
+    # Drops LR by half whenever val_acc hasn't improved for 3 epochs, so
+    # training can keep making progress in later epochs instead of just
+    # oscillating around the same accuracy at a fixed LR.
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="max", factor=0.5, patience=3
+    )
+
     best_val_acc = 0.0
+    best_val_loss = float("inf")
+    epochs_since_improve = 0
 
     for epoch in range(1, args.epochs + 1):
         train_loss, train_acc = run_epoch(model, train_loader, criterion, optimizer, device, train=True)
         val_loss, val_acc = run_epoch(model, val_loader, criterion, optimizer, device, train=False)
 
+        current_lr = optimizer.param_groups[0]["lr"]
         print(f"Epoch {epoch:3d}/{args.epochs}  "
               f"train_loss={train_loss:.4f} train_acc={train_acc:.4f}  "
-              f"val_loss={val_loss:.4f} val_acc={val_acc:.4f}")
+              f"val_loss={val_loss:.4f} val_acc={val_acc:.4f}  lr={current_lr:.2e}")
+
+        scheduler.step(val_acc)
+        best_val_loss = min(best_val_loss, val_loss)
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
+            epochs_since_improve = 0
             torch.save({
                 "model_state_dict": model.state_dict(),
                 "image_size": IMAGE_SIZE,
                 "val_acc": val_acc,
+                "val_loss": val_loss,
                 "class_names": CLASS_NAMES,
             }, CHECKPOINT_PATH)
             print(f"  -> new best val_acc {val_acc:.4f}, saved to {CHECKPOINT_PATH}")
+        else:
+            epochs_since_improve += 1
+            if epochs_since_improve >= args.patience:
+                print(f"\nNo val_acc improvement for {args.patience} epochs, stopping early "
+                      f"at epoch {epoch}.")
+                break
 
-    print(f"\nTraining complete. Best val accuracy: {best_val_acc:.4f}")
+    print(f"\nTraining complete. Best val accuracy: {best_val_acc:.4f}  "
+          f"Best val loss seen: {best_val_loss:.4f}")
     print(f"Best checkpoint saved at: {CHECKPOINT_PATH}")
 
 
