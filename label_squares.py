@@ -41,19 +41,41 @@ import argparse
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_16h5)
 detector_params = cv2.aruco.DetectorParameters()
 
-detector_params.adaptiveThreshWinSizeMin = 3
-detector_params.adaptiveThreshWinSizeMax = 30
-detector_params.adaptiveThreshWinSizeStep = 2
-detector_params.adaptiveThreshConstant = 7
-detector_params.minMarkerPerimeterRate = 0.01
-detector_params.maxMarkerPerimeterRate = 5.0
-detector_params.polygonalApproxAccuracyRate = 0.09
+# detector_params.adaptiveThreshWinSizeMin = 3
+# detector_params.adaptiveThreshWinSizeMax = 30
+# detector_params.adaptiveThreshWinSizeStep = 2
+# detector_params.adaptiveThreshConstant = 7
+# detector_params.minMarkerPerimeterRate = 0.01
+# detector_params.maxMarkerPerimeterRate = 5.0
+# detector_params.polygonalApproxAccuracyRate = 0.09
 
-detector_params.minCornerDistanceRate = 0.03        # lower = tolerate tags whose corners are closer together (small/far tags)
-detector_params.minMarkerDistanceRate = 0.03        # lower = tolerate tags close to each other on the board
-detector_params.minOtsuStdDev = 3.0                 # lower = still attempt detection on low-contrast crops (shadowed squares)
-detector_params.errorCorrectionRate = 0.8           # raise from default 0.6 to accept more bit errors when decoding IDs
-detector_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX  # more accurate corners → fewer rejects downstream
+# Wider/finer adaptive threshold search — catches more lighting conditions
+detector_params.adaptiveThreshWinSizeMin = 3
+detector_params.adaptiveThreshWinSizeMax = 75
+detector_params.adaptiveThreshWinSizeStep = 4
+detector_params.adaptiveThreshConstant = 7
+
+# Let smaller/farther tags count as candidates
+detector_params.minMarkerPerimeterRate = 0.01
+detector_params.maxMarkerPerimeterRate = 6.0
+detector_params.polygonalApproxAccuracyRate = 0.14
+
+# Looser polygon fit tolerates blur/motion/warped corners
+detector_params.polygonalApproxAccuracyRate = 0.10
+
+detector_params.errorCorrectionRate = 0.9
+
+detector_params.minCornerDistanceRate = 0.02
+detector_params.minDistanceToBorder = 0
+detector_params.minMarkerDistanceRate = 0.02
+
+detector_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+detector_params.cornerRefinementWinSize = 7
+detector_params.cornerRefinementMaxIterations = 50
+detector_params.cornerRefinementMinAccuracy = 0.05
+
+detector_params.perspectiveRemovePixelPerCell = 8
+detector_params.perspectiveRemoveIgnoredMarginPerCell = 0.20
 
 detector = cv2.aruco.ArucoDetector(aruco_dict, detector_params)
 

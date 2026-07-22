@@ -8,7 +8,7 @@ doesn't need to know anything about chess.engine directly.
 import chess
 import chess.engine
 
-DEFAULT_STOCKFISH_PATH = r"StockFish\stockfish\stockfish-windows-x86-64-avx2.exe"
+DEFAULT_STOCKFISH_PATH = r"C:\Users\eweng\OneDrive\Documents\Owen\Coding\StockFish\stockfish-windows-x86-64-avx2.exe"
 DEFAULT_TIME_LIMIT = 1.0  # seconds Stockfish is given to pick a move
 
 

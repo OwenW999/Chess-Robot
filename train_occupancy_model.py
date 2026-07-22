@@ -262,11 +262,11 @@ def run_epoch(model, loader, criterion, optimizer, device, train):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=100,
+    parser.add_argument("--epochs", type=int, default=150,
                          help="Max epochs. Early stopping will usually halt well before this.")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--patience", type=int, default=8,
+    parser.add_argument("--patience", type=int, default=15,
                          help="Stop if val_acc hasn't improved for this many epochs.")
     args = parser.parse_args()
 
