@@ -12,12 +12,21 @@ PORT = 'COM3'  # <-- change this to match your Device Manager COM port
 
 # bases forwards is 137.5* 
 
+
+# claw fully closed -5 open is 69
+# wrist full back is 5 forwards is 150   Range: (5, 150)
+# elbow full back is 55 forwards is 219  Range: (55, 219)
+# Shoulder full back is 98 forwards is 230  Range: (98, 230)
+#base full right is 85 left is 194 Range: (85, 194)
+
+# fully collpase 'shoulder': 172.45421245421244, 'elbow': 219
 # Map joint names to servo IDs (adjust based on how you assigned IDs)
 JOINT_IDS = {
     'base': 2,
     'shoulder': 3,
-    # 'elbow': 4,
-    # 'wrist': 5,
+    'elbow': 4,
+    'wrist': 5,
+    'claw': 6,
 }
 
 # Servo range: 0-4095 over the servo's full rotation (usually ~300 deg for STS3215)
@@ -45,7 +54,7 @@ class ArmController:
         """Convert raw servo position back to degrees."""
         return (pos / SERVO_MAX_POS) * SERVO_MAX_DEG
 
-    def move_joint(self, joint_name, angle_deg, speed=550, acc=29):
+    def move_joint(self, joint_name, angle_deg, speed=800, acc=50):
         """Move a single joint to an angle in degrees."""
         if joint_name not in JOINT_IDS:
             raise ValueError(f"Unknown joint: {joint_name}")
@@ -81,19 +90,51 @@ if __name__ == "__main__":
     arm = ArmController()
 
     print("\nCurrent joint angles:")
+
+    # arm.move_joint('claw', 69)
+    # time.sleep(2)
+    # arm.move_joint('claw', -5)
+
+    # arm.move_joint('wrist', 150)
+    # time.sleep(2)
+    # arm.move_joint('wrist', 5)
+   
+    # arm.move_joint('elbow', 55)
+    # time.sleep(5)
+    # arm.move_joint('elbow', 90)
+
+    # arm.move_joint('shoulder', 98)
+    # time.sleep(15)
+    # arm.move_joint('shoulder', 230)
+    
+    arm.move_joint('base', 85)
+    time.sleep(2)
+    arm.move_joint('base', 194)
+    time.sleep(2)
+    arm.move_joint('base', 139.5)
+     
+    for i in range(100):
+        print(arm.read_all_angles())
+        time.sleep(0.5)
     print(arm.read_all_angles())
 
     # print("\nCentering all joints...")
     # arm.center_all()
     # time.sleep(2)
 
-    print("Moving base to 45 degrees...")
-    arm.move_joint('base', 125)
-    arm.move_joint('shoulder', 250)
+    # print("Moving base to 45 degrees...")
+    # arm.move_joint('base', 125)
+    # arm.move_joint('shoulder', 185)
+    # arm.move_joint('elbow', 90)
+
+    # time.sleep(5)
+    # arm.move_joint('base', 125)
+    # arm.move_joint('shoulder', 285)
+    # arm.move_joint('elbow', 70)
     time.sleep(2)
     print(arm.read_all_angles())
     time.sleep(1)
-    arm.move_joint('shoulder', 175)
+    #arm.move_joint('shoulder', 175)
     time.sleep(2)
     # print("\nFinal joint angles:")
     print(arm.read_all_angles())
