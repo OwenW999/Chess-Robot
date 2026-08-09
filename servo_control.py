@@ -34,14 +34,14 @@ geom = ArmGeometry(
     L1=232.5,          # mm
     L2=261.561,        # mm
     d_fwd=0.0,         # mm
-    d_down=178.375,    # mm
+    d_down= 178.375,    # mm
     shoulder_height=123.5,
     base_offset=33.5,
 )
 
 # Servo range: 0-4095 over the servo's full rotation (usually ~300 deg for STS3215)
 SERVO_MAX_POS = 4095
-SERVO_MAX_DEG = 300  # check your servo's actual rated range if unsure
+SERVO_MAX_DEG = 360  # check your servo's actual rated range if unsure
 
 
 class ArmController:
@@ -64,7 +64,7 @@ class ArmController:
         """Convert raw servo position back to degrees."""
         return (pos / SERVO_MAX_POS) * SERVO_MAX_DEG
 
-    def move_joint(self, joint_name, angle_deg, speed=800, acc=50):
+    def move_joint(self, joint_name, angle_deg, speed=1500, acc=60):
         """Move a single joint to an angle in degrees."""
         if joint_name not in JOINT_IDS:
             raise ValueError(f"Unknown joint: {joint_name}")
@@ -95,20 +95,48 @@ class ArmController:
         for joint in JOINT_IDS:
             self.move_joint(joint, SERVO_MAX_DEG / 2, speed=100, acc=10)
 
-    def move_to_cartesian(self, x, y, z, elbow_up=True):
-        theta0, theta1, theta2, theta3 = inverse_kinematics(x, y, z, geom, elbow_up=True)
+    def move_to_cartesian(self, x, y, z):
+        theta0, theta1, theta2, theta3 = inverse_kinematics(x, y, z, geom, elbow_up=False)
         print(f"Moving to Cartesian ({x}, {y}, {z}) -> joint angles (deg): "
-              f"base: {139.5 + np.degrees(theta0):.1f}, "
-              f"shoulder: {273 - np.degrees(theta1):.1f}, "
-              f"elbow: {46.8 - np.degrees(theta2):.1f}, "
-              f"wrist: {167.9 - np.degrees(theta3):.1f}")
-        
-        # self.move_joint('base',139.5 +  np.degrees(theta0))
-        # self.move_joint('shoulder', 273 - np.degrees(theta1))
-        # self.move_joint('elbow', 46.8 - np.degrees(theta2))
-        # self.move_joint('wrist', 167.9 - np.degrees(theta3))
+              f"base: {166 + np.degrees(theta0):.1f}, "
+              f"shoulder: {291 - np.degrees(theta1):.1f}, "
+              f"elbow: {92.8 - np.degrees(theta2):.1f}, "
+              f"wrist: {163 - np.degrees(theta3):.1f}")
+
+        # {'base': 158.16849816849816, 'shoulder': 159.12087912087912, 'elbow': 174.06593406593407, 'wrist': 128.05860805860806, 'claw': 0.5128205128205128}
+        self.move_joint('base', 166 +  np.degrees(theta0))
+        self.move_joint('shoulder', 291 - np.degrees(theta1))
+        self.move_joint('elbow', 92.8 - np.degrees(theta2))
+        self.move_joint('wrist', 163 - np.degrees(theta3))
+
+    def stow(self):
+        """Move the arm to a safe stowed position."""
+        self.move_joint('base', 167.55)
+        self.move_joint('shoulder', 116)
+        self.move_joint('elbow', 265)
+        self.move_joint('wrist', 0)
+        self.move_joint('claw', 100)
 
 
+    def move_to_square(self, square_name, above = True):
+        """Move the arm to a specific chess square (e.g., 'e4')."""
+        # Convert chess square to board coordinates (0-7 for x and y)
+        col = ord(square_name[0]) - ord('a')  # 'a' -> 0, 'b' -> 1, ..., 'h' -> 7
+        row = 7 - (int(square_name[1]) - 1)     # '1' -> 0, '2' -> 1, ..., '8' -> 7
+
+        # Map board coordinates to physical coordinates (in mm)
+        # Assuming the bottom-left corner of the board is at (x=0, y=0)
+        square_size_mm = 52  # adjust based on your actual board size
+        arm_offset_mm = 64  # adjust if your arm's base is offset from the board's origin
+        center_offset_mm = 195
+        x = row * square_size_mm + square_size_mm / 2 + arm_offset_mm
+        y = col * square_size_mm + square_size_mm / 2 - center_offset_mm
+        if above:
+            z = 120  # height above the board; adjust as needed
+        else:
+            z = 20  # height above the board; adjust as needed
+
+        self.move_to_cartesian(x, y, z)
 
 if __name__ == "__main__":
     arm = ArmController()
@@ -130,8 +158,23 @@ if __name__ == "__main__":
     # arm.move_joint('shoulder', 98)
     # time.sleep(15)
     # arm.move_joint('shoulder', 230)
-    
-    arm.move_to_cartesian(275, 115, 120, elbow_up=True)
+    arm.stow()
+    time.sleep(4)
+    arm.move_to_square('a8', above=False)
+    time.sleep(4)
+    arm.move_to_square('e4', above=True)
+    time.sleep(.5)
+    arm.move_to_square('h1', above=False)
+    time.sleep(6)
+    arm.move_to_square('e4', above=True)
+    time.sleep(.5)
+    arm.move_to_square('g8', above=False)
+    time.sleep(6)
+    arm.move_to_square('e4', above=True)
+    time.sleep(.5)
+    arm.move_to_square('e4', above=False)
+    time.sleep(6)
+    arm.stow()
     # arm.move_joint('base', 85)
     # time.sleep(2)
     # arm.move_joint('base', 194)
