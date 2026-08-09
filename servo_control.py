@@ -5,7 +5,8 @@ Run this directly on the machine the adapter is plugged into (Windows desktop).
 
 from st3215 import ST3215
 import time
-
+from ik import inverse_kinematics, ArmGeometry, UnreachableTarget
+import numpy as np
 # --- CONFIG ---
 PORT = 'COM3'  # <-- change this to match your Device Manager COM port
 
@@ -17,7 +18,7 @@ PORT = 'COM3'  # <-- change this to match your Device Manager COM port
 # wrist full back is 5 forwards is 150   Range: (5, 150)
 # elbow full back is 55 forwards is 219  Range: (55, 219)
 # Shoulder full back is 98 forwards is 230  Range: (98, 230)
-#base full right is 85 left is 194 Range: (85, 194)
+# base full right is 85 left is 194 Range: (85, 194)
 
 # fully collpase 'shoulder': 172.45421245421244, 'elbow': 219
 # Map joint names to servo IDs (adjust based on how you assigned IDs)
@@ -28,6 +29,15 @@ JOINT_IDS = {
     'wrist': 5,
     'claw': 6,
 }
+
+geom = ArmGeometry(
+    L1=232.5,          # mm
+    L2=261.561,        # mm
+    d_fwd=0.0,         # mm
+    d_down=178.375,    # mm
+    shoulder_height=123.5,
+    base_offset=33.5,
+)
 
 # Servo range: 0-4095 over the servo's full rotation (usually ~300 deg for STS3215)
 SERVO_MAX_POS = 4095
@@ -85,6 +95,20 @@ class ArmController:
         for joint in JOINT_IDS:
             self.move_joint(joint, SERVO_MAX_DEG / 2, speed=100, acc=10)
 
+    def move_to_cartesian(self, x, y, z, elbow_up=True):
+        theta0, theta1, theta2, theta3 = inverse_kinematics(x, y, z, geom, elbow_up=True)
+        print(f"Moving to Cartesian ({x}, {y}, {z}) -> joint angles (deg): "
+              f"base: {139.5 + np.degrees(theta0):.1f}, "
+              f"shoulder: {273 - np.degrees(theta1):.1f}, "
+              f"elbow: {46.8 - np.degrees(theta2):.1f}, "
+              f"wrist: {167.9 - np.degrees(theta3):.1f}")
+        
+        # self.move_joint('base',139.5 +  np.degrees(theta0))
+        # self.move_joint('shoulder', 273 - np.degrees(theta1))
+        # self.move_joint('elbow', 46.8 - np.degrees(theta2))
+        # self.move_joint('wrist', 167.9 - np.degrees(theta3))
+
+
 
 if __name__ == "__main__":
     arm = ArmController()
@@ -107,11 +131,12 @@ if __name__ == "__main__":
     # time.sleep(15)
     # arm.move_joint('shoulder', 230)
     
-    arm.move_joint('base', 85)
-    time.sleep(2)
-    arm.move_joint('base', 194)
-    time.sleep(2)
-    arm.move_joint('base', 139.5)
+    arm.move_to_cartesian(275, 115, 120, elbow_up=True)
+    # arm.move_joint('base', 85)
+    # time.sleep(2)
+    # arm.move_joint('base', 194)
+    # time.sleep(2)
+    # arm.move_joint('base', 139.5)
      
     for i in range(100):
         print(arm.read_all_angles())
