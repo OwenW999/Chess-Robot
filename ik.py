@@ -27,7 +27,7 @@ from dataclasses import dataclass
 class ArmGeometry:
     L1: float = 232.5       # upper arm length (shoulder -> elbow)
     L2: float = 261.561        # forearm length (elbow -> wrist)
-    d_fwd: float = 0.0        # claw offset, horizontal, wrist -> claw tip
+    d_fwd: float = 52.67        # claw offset, horizontal, wrist -> claw tip
     d_down: float = 178.375    # claw offset, vertical drop, wrist -> claw tip
     shoulder_height: float = 123.5   # height of shoulder joint above base origin
     base_offset: float = 33.5        # horizontal offset from yaw axis to shoulder axis

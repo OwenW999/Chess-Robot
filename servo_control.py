@@ -14,7 +14,7 @@ PORT = 'COM3'  # <-- change this to match your Device Manager COM port
 # bases forwards is 137.5* 
 
 
-# claw fully closed -5 open is 69
+# claw normal piece grab is 82 pawn is 75 and open is 98
 # wrist full back is 5 forwards is 150   Range: (5, 150)
 # elbow full back is 55 forwards is 219  Range: (55, 219)
 # Shoulder full back is 98 forwards is 230  Range: (98, 230)
@@ -33,7 +33,7 @@ JOINT_IDS = {
 geom = ArmGeometry(
     L1=232.5,          # mm
     L2=261.561,        # mm
-    d_fwd=0.0,         # mm
+    d_fwd=52.67,         # mm
     d_down= 178.375,    # mm
     shoulder_height=123.5,
     base_offset=33.5,
@@ -64,7 +64,7 @@ class ArmController:
         """Convert raw servo position back to degrees."""
         return (pos / SERVO_MAX_POS) * SERVO_MAX_DEG
 
-    def move_joint(self, joint_name, angle_deg, speed=1500, acc=60):
+    def move_joint(self, joint_name, angle_deg, speed=1000, acc=40):
         """Move a single joint to an angle in degrees."""
         if joint_name not in JOINT_IDS:
             raise ValueError(f"Unknown joint: {joint_name}")
@@ -95,7 +95,7 @@ class ArmController:
         for joint in JOINT_IDS:
             self.move_joint(joint, SERVO_MAX_DEG / 2, speed=100, acc=10)
 
-    def move_to_cartesian(self, x, y, z):
+    def move_to_cartesian(self, x, y, z, slow = False):
         theta0, theta1, theta2, theta3 = inverse_kinematics(x, y, z, geom, elbow_up=False)
         print(f"Moving to Cartesian ({x}, {y}, {z}) -> joint angles (deg): "
               f"base: {166 + np.degrees(theta0):.1f}, "
@@ -104,9 +104,11 @@ class ArmController:
               f"wrist: {163 - np.degrees(theta3):.1f}")
 
         # {'base': 158.16849816849816, 'shoulder': 159.12087912087912, 'elbow': 174.06593406593407, 'wrist': 128.05860805860806, 'claw': 0.5128205128205128}
-        self.move_joint('base', 166 +  np.degrees(theta0))
-        self.move_joint('shoulder', 291 - np.degrees(theta1))
-        self.move_joint('elbow', 92.8 - np.degrees(theta2))
+        speed = 500 if slow else 1000
+        acc = 20 if slow else 40
+        self.move_joint('base', 166 +  np.degrees(theta0), speed=speed, acc=acc)
+        self.move_joint('shoulder', 291 - np.degrees(theta1), speed=speed, acc=acc)
+        self.move_joint('elbow', 92.8 - np.degrees(theta2), speed=speed, acc=acc)
         self.move_joint('wrist', 163 - np.degrees(theta3))
 
     def stow(self):
@@ -117,8 +119,7 @@ class ArmController:
         self.move_joint('wrist', 0)
         self.move_joint('claw', 100)
 
-
-    def move_to_square(self, square_name, above = True):
+    def move_to_square(self, square_name, above = True, slow = False):
         """Move the arm to a specific chess square (e.g., 'e4')."""
         # Convert chess square to board coordinates (0-7 for x and y)
         col = ord(square_name[0]) - ord('a')  # 'a' -> 0, 'b' -> 1, ..., 'h' -> 7
@@ -126,17 +127,39 @@ class ArmController:
 
         # Map board coordinates to physical coordinates (in mm)
         # Assuming the bottom-left corner of the board is at (x=0, y=0)
-        square_size_mm = 52  # adjust based on your actual board size
-        arm_offset_mm = 64  # adjust if your arm's base is offset from the board's origin
-        center_offset_mm = 195
+        square_size_mm = 55  # adjust based on your actual board size
+        arm_offset_mm = 90  # adjust if your arm's base is offset from the board's origin
+        center_offset_mm = 208
         x = row * square_size_mm + square_size_mm / 2 + arm_offset_mm
         y = col * square_size_mm + square_size_mm / 2 - center_offset_mm
         if above:
-            z = 120  # height above the board; adjust as needed
+            z = 150  # height above the board; adjust as needed
         else:
-            z = 20  # height above the board; adjust as needed
+            z = 15  # height above the board; adjust as needed
 
-        self.move_to_cartesian(x, y, z)
+        self.move_to_cartesian(x, y, z, slow=slow)
+
+    def drop(self, square_name):
+        """Move to a square and open the claw to drop a piece."""
+        self.move_to_square(square_name, above=False)
+        time.sleep(2)  # wait for arm to reach position
+        self.move_joint('claw', 98)  # open claw
+        time.sleep(2)  # wait for claw to open
+        self.move_to_square(square_name, above=True)  # lift back up
+        time.sleep(2)  # wait for arm to lift
+
+    def pick(self, square_name, pawn = False):
+        """Move to a square and close the claw to pick up a piece."""
+        self.move_joint('claw', 98)  # open claw
+        self.move_to_square(square_name, above=False, slow=True)
+        time.sleep(2)  # wait for arm to reach position
+        if pawn:
+            self.move_joint('claw', 75)  # close claw for pawn
+        else:
+            self.move_joint('claw', 82)  # close claw for other pieces
+        time.sleep(2)  # wait for claw to close
+        self.move_to_square(square_name, above=True)  # lift back up
+        time.sleep(2)  # wait for arm to lift
 
 if __name__ == "__main__":
     arm = ArmController()
@@ -158,29 +181,53 @@ if __name__ == "__main__":
     # arm.move_joint('shoulder', 98)
     # time.sleep(15)
     # arm.move_joint('shoulder', 230)
-    arm.stow()
-    time.sleep(4)
-    arm.move_to_square('a8', above=False)
-    time.sleep(4)
-    arm.move_to_square('e4', above=True)
-    time.sleep(.5)
-    arm.move_to_square('h1', above=False)
-    time.sleep(6)
-    arm.move_to_square('e4', above=True)
-    time.sleep(.5)
-    arm.move_to_square('g8', above=False)
-    time.sleep(6)
-    arm.move_to_square('e4', above=True)
-    time.sleep(.5)
-    arm.move_to_square('e4', above=False)
-    time.sleep(6)
-    arm.stow()
+    # arm.stow()
+    # time.sleep(4)
+    # arm.move_to_square('a8', above=False)
+    # time.sleep(4)
+    # arm.move_to_square('e4', above=True)
+    # time.sleep(.5)
+    # arm.move_to_square('h1', above=False)
+    # time.sleep(6)
+    # arm.move_to_square('e4', above=True)
+    # time.sleep(.5)
+    # arm.move_to_square('g8', above=False)
+    # time.sleep(6)
+    # arm.move_to_square('e4', above=True)
+    # time.sleep(.5)
+    # arm.move_to_square('e4', above=False)
+    # time.sleep(6)
+    # arm.stow()
+    # time.sleep(3)
+    # arm.stow()
+    # time.sleep(3)
+    # arm.move_to_square('h8', above=False)
+    # time.sleep(7)
+    # # arm.pick('e5', pawn=False)
+    # arm.move_to_square('a8', above=False)
+    # time.sleep(7)
+    #     # arm.pick('e5', pawn=False)
+    # arm.move_to_square('a1', above=False)
+    # time.sleep(7)
+    #     # arm.pick('e5', pawn=False)
+    # arm.move_to_square('h1', above=False)
+    # time.sleep(7)
+    # # arm.drop('h6')
+    # arm.stow()
     # arm.move_joint('base', 85)
     # time.sleep(2)
     # arm.move_joint('base', 194)
     # time.sleep(2)
     # arm.move_joint('base', 139.5)
-     
+    arm.move_to_square('e5', above=True)
+    time.sleep(3)
+    arm.pick('e5', pawn=False)
+
+    arm.move_to_square('h8', above=True)
+    time.sleep(3)
+    arm.drop('h8')
+
+    arm.stow()
     for i in range(100):
         print(arm.read_all_angles())
         time.sleep(0.5)
