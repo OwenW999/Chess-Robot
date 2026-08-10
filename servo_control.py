@@ -33,7 +33,7 @@ JOINT_IDS = {
 geom = ArmGeometry(
     L1=232.5,          # mm
     L2=261.561,        # mm
-    d_fwd=52.67,         # mm
+    d_fwd=42, #52.67,         # mm
     d_down= 178.375,    # mm
     shoulder_height=123.5,
     base_offset=33.5,
@@ -97,29 +97,31 @@ class ArmController:
 
     def move_to_cartesian(self, x, y, z, slow = False):
         theta0, theta1, theta2, theta3 = inverse_kinematics(x, y, z, geom, elbow_up=False)
-        print(f"Moving to Cartesian ({x}, {y}, {z}) -> joint angles (deg): "
-              f"base: {166 + np.degrees(theta0):.1f}, "
-              f"shoulder: {291 - np.degrees(theta1):.1f}, "
-              f"elbow: {92.8 - np.degrees(theta2):.1f}, "
-              f"wrist: {163 - np.degrees(theta3):.1f}")
+        # print(f"Moving to Cartesian ({x}, {y}, {z}) -> joint angles (deg): "
+        #       f"base: {166 + np.degrees(theta0):.1f}, "
+        #       f"shoulder: {291 - np.degrees(theta1):.1f}, "
+        #       f"elbow: {92.8 - np.degrees(theta2):.1f}, "
+        #       f"wrist: {163 - np.degrees(theta3):.1f}")
 
         # {'base': 158.16849816849816, 'shoulder': 159.12087912087912, 'elbow': 174.06593406593407, 'wrist': 128.05860805860806, 'claw': 0.5128205128205128}
         speed = 500 if slow else 1000
         acc = 10 if slow else 40
-        self.move_joint('base', 166 +  np.degrees(theta0), speed=speed, acc=acc)
-        self.move_joint('shoulder', 291 - np.degrees(theta1), speed=speed, acc=acc)
-        self.move_joint('elbow', 92.8 - np.degrees(theta2), speed=speed, acc=acc)
-        self.move_joint('wrist', 163 - np.degrees(theta3), speed=int(speed * 1.8), acc=int(acc * 1.8))
+        
+        self.move_joint_timed('base', 169 +  np.degrees(theta0), duration = 1)
+        self.move_joint_timed('shoulder', 291 - np.degrees(theta1), duration = 1)
+        self.move_joint_timed('elbow', 92.8 - np.degrees(theta2), duration = 1)
+        self.move_joint_timed('wrist', 163 - np.degrees(theta3), duration = 1)
 
     def stow(self):
         """Move the arm to a safe stowed position."""
-        self.move_joint('base', 167.55)
-        self.move_joint('shoulder', 116)
-        self.move_joint('elbow', 265)
-        self.move_joint('wrist', 0)
-        self.move_joint('claw', 100)
+        duration = 1
+        self.move_joint_timed('base', 167.55, duration)
+        self.move_joint_timed('shoulder', 116, duration)
+        self.move_joint_timed('elbow', 265, duration)
+        self.move_joint_timed('wrist', 0, duration)
+        self.move_joint_timed('claw', 100, duration)
 
-    def move_to_square(self, square_name, z = 150, slow = False):
+    def move_to_square(self, square_name, z = 155, slow = False):
         """Move the arm to a specific chess square (e.g., 'e4')."""
         # Convert chess square to board coordinates (0-7 for x and y)
         col = ord(square_name[0]) - ord('a')  # 'a' -> 0, 'b' -> 1, ..., 'h' -> 7
@@ -127,7 +129,7 @@ class ArmController:
 
         # Map board coordinates to physical coordinates (in mm)
         # Assuming the bottom-left corner of the board is at (x=0, y=0)
-        square_size_mm = 55  # adjust based on your actual board size
+        square_size_mm = 53  # adjust based on your actual board size
         arm_offset_mm = 90  # adjust if your arm's base is offset from the board's origin
         center_offset_mm = 211
         x = row * square_size_mm + square_size_mm / 2 + arm_offset_mm
@@ -153,29 +155,29 @@ class ArmController:
 
     def drop(self, square_name):
         """Move to a square and open the claw to drop a piece."""
-        for z in [150, 125, 100, 75, 50, 20]:  # move down in steps
-            self.move_to_square(square_name, z=z, slow=True)
+
+        self.move_to_square(square_name, z=15, slow=True)
 
         self.wait_for_move_completion()
-        self.move_joint('claw', 98)  # open claw
+        self.move_joint('claw', 92)  # open claw
         self.wait_for_move_completion()
-        for z in [50, 75, 100, 150]:  # move down in steps
-            self.move_to_square(square_name, z=z, slow=True)
+
+        self.move_to_square(square_name, z=130, slow=True)
         self.wait_for_move_completion()
 
     def pick(self, square_name, pawn = False):
         """Move to a square and close the claw to pick up a piece."""
-        self.move_joint('claw', 98)  # open claw
-        for z in [150, 125, 100, 75, 50, 15]:  # move down in steps
-            self.move_to_square(square_name, z=z, slow=True)
+        self.move_joint('claw', 97)  # open claw
+
+        self.move_to_square(square_name, z=15, slow=True)
         self.wait_for_move_completion()
         if pawn:
             self.move_joint('claw', 72)  # close claw for pawn
         else:
             self.move_joint('claw', 82)  # close claw for other pieces
         self.wait_for_move_completion()
-        for z in [50, 75, 100, 150]:  # move down in steps
-            self.move_to_square(square_name, z=z, slow=True)
+
+        self.move_to_square(square_name, z=130, slow=True)
         self.wait_for_move_completion()
 
     def from_to(self, from_square, to_square, pawn = False):
@@ -188,71 +190,70 @@ class ArmController:
         self.wait_for_move_completion()
         self.drop(to_square)
 
+    def move_joint_timed(self, joint_name, angle_deg, duration):
+        servo_id = JOINT_IDS[joint_name]
+        current_deg = self.read_joint_angle(joint_name)
+        delta = abs(angle_deg - current_deg)
+        delta_steps = self.deg_to_pos(delta)
+        speed = max(30, int(delta_steps / duration)) if duration > 0 else 1000
+        pos = max(0, min(SERVO_MAX_POS, self.deg_to_pos(angle_deg)))
+        self.servo.MoveTo(servo_id, pos, speed=speed, acc=60)
+
+
+    STS_P_COEF = 0x15   # 1 byte
+    STS_D_COEF = 0x16   # 1 byte
+    STS_I_COEF = 0x17   # 1 byte
+    STS_MIN_START_FORCE = 0x18  # 2 bytes, little-endian
+    STS_CW_DEADBAND = 0x1A      # 1 byte
+    STS_CCW_DEADBAND = 0x1B     # 1 byte
+
+    def tune_position_hold(self, sts_id, p=60, i=5, d=32, min_force=80):
+        self.servo.writeTxRx(sts_id, self.STS_P_COEF, 1, [p])
+        self.servo.writeTxRx(sts_id, self.STS_I_COEF, 1, [i])
+        self.servo.writeTxRx(sts_id, self.STS_D_COEF, 1, [d])
+        self.servo.writeTxRx(sts_id, self.STS_MIN_START_FORCE, 2,
+                            [min_force & 0xFF, (min_force >> 8) & 0xFF])
+
+
+    def set_deadband(self, sts_id, deadband=4):
+        self.servo.writeTxRx(sts_id, self.STS_CW_DEADBAND, 1, [deadband])
+        self.servo.writeTxRx(sts_id, self.STS_CCW_DEADBAND, 1, [deadband])
+
+    def camera_clear(self):
+        """Move the arm out of the camera's view so vision.get_board_grid() gets a clean read."""
+        self.move_joint('base', 110.94505494505495)
+        self.move_joint('shoulder', 116.74725274725276)
+        self.move_joint('elbow', 240)
+        self.move_joint('wrist', 0.7912087912087912)
+        self.move_joint('claw', 92)
+
 if __name__ == "__main__":
     arm = ArmController()
 
-    print("\nCurrent joint angles:")
+    # One-time tuning — comment out after running once
+    # for name, sid in JOINT_IDS.items():
+    #     if name in ('shoulder', 'elbow'):
+    #         # these carry the most gravity load — tune more aggressively
+    #         arm.tune_position_hold(sid, p=60, i=0, d=32, min_force=100)
+    #         print(f"Tuned {name} (id {sid}) for position hold.")
+    #     else:
+    #         arm.tune_position_hold(sid, p=32, i=0, d=32, min_force=20)
+    #     arm.set_deadband(sid, deadband=1)
+    #     time.sleep(0.05)  # small gap between writes
+    
 
-    # arm.move_joint('claw', 69)
-    # time.sleep(2)
-    # arm.move_joint('claw', -5)
+    # arm.from_to('e7', 'h1', pawn=False)
+    # arm.from_to('h1', 'e7', pawn=False)
+    # arm.stow()
 
-    # arm.move_joint('wrist', 150)
-    # time.sleep(2)
-    # arm.move_joint('wrist', 5)
-   
-    # arm.move_joint('elbow', 55)
-    # time.sleep(5)
-    # arm.move_joint('elbow', 90)
-
-    # arm.move_joint('shoulder', 98)
-    # time.sleep(15)
-    # arm.move_joint('shoulder', 230)
-    # arm.stow()
-    # time.sleep(4)
-    # arm.move_to_square('a8', above=False)
-    # time.sleep(4)
-    # arm.move_to_square('e4', above=True)
-    # time.sleep(.5)
-    # arm.move_to_square('h1', above=False)
-    # time.sleep(6)
-    # arm.move_to_square('e4', above=True)
-    # time.sleep(.5)
-    # arm.move_to_square('g8', above=False)
-    # time.sleep(6)
-    # arm.move_to_square('e4', above=True)
-    # time.sleep(.5)
-    # arm.move_to_square('e4', above=False)
-    # time.sleep(6)
-    # arm.stow()
-    # time.sleep(3)
-    # arm.stow()
-    # time.sleep(3)
-    # arm.move_to_square('h8', above=False)
+    # arm.move_to_square('a1', z=50)
     # time.sleep(7)
-    # # arm.pick('e5', pawn=False)
-    # arm.move_to_square('a8', above=False)
+    # arm.move_to_square('h1', z=50)
     # time.sleep(7)
-    #     # arm.pick('e5', pawn=False)
-    # arm.move_to_square('a1', above=False)
-    # time.sleep(7)
-    #     # arm.pick('e5', pawn=False)
-    # arm.move_to_square('h1', above=False)
-    # time.sleep(7)
-    # # arm.drop('h6')
-    # arm.stow()
-    # arm.move_joint('base', 85)
-    # time.sleep(2)
-    # arm.move_joint('base', 194)
-    # time.sleep(2)
-    # arm.move_joint('base', 139.5)
-    arm.from_to('e7', 'h4', pawn=False)
-    arm.from_to('h4', 'e7', pawn=False)
-    arm.stow()
-
-    # for i in range(100):
-    #     print(arm.read_all_angles())
-    #     time.sleep(0.5)
+    # arm.move_to_square('h8', z=50)
+    for i in range(100):
+        print(arm.read_all_angles())
+        time.sleep(0.5)
     # print(arm.read_all_angles())
 
     # print("\nCentering all joints...")

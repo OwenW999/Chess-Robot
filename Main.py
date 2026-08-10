@@ -22,6 +22,9 @@ import torch
 import vision
 import engine
 from inference import board_to_grid, infer_move
+from servo_control import ArmController
+from move_executor import MoveExecutor
+import chess.engine
 
 CAMERA_INDEX = 0
 
@@ -55,8 +58,13 @@ def main():
     sf_engine = engine.start_engine()
     window_name = "Chess Robot - press SPACE after your move, 'q' to quit"
 
+    arm = ArmController()
+    executor = MoveExecutor(arm)
+
     try:
         print("Confirming starting position against the camera...")
+        arm.camera_clear()
+        arm.wait_for_move_completion()
         start_grid = vision.get_board_grid(model, device, cap)
         if start_grid is not None and start_grid != board_to_grid(board):
             print("WARNING: what the camera sees doesn't match a fresh "
@@ -87,13 +95,18 @@ def main():
 
             engine_move = engine.get_best_move(sf_engine, board)
             print(f"Engine plays: {board.san(engine_move)}")
-            board.push(engine_move)
-            # TODO: send engine_move to your arm controller here
+            executor.execute_move(board, engine_move)  # this pushes the move internally
+            arm.camera_clear()
+            arm.wait_for_move_completion()
 
         print(f"Game over: {board.result()}")
 
     finally:
         engine.stop_engine(sf_engine)
+        try:
+            arm.stow()
+        except Exception as e:
+            print(f"Warning: couldn't stow arm on exit: {e}")
         cap.release()
         cv2.destroyAllWindows()
 
