@@ -64,7 +64,7 @@ class ArmController:
         """Convert raw servo position back to degrees."""
         return (pos / SERVO_MAX_POS) * SERVO_MAX_DEG
 
-    def move_joint(self, joint_name, angle_deg, speed=1000, acc=40):
+    def move_joint(self, joint_name, angle_deg, speed=1000, acc=20):
         """Move a single joint to an angle in degrees."""
         if joint_name not in JOINT_IDS:
             raise ValueError(f"Unknown joint: {joint_name}")
@@ -105,11 +105,11 @@ class ArmController:
 
         # {'base': 158.16849816849816, 'shoulder': 159.12087912087912, 'elbow': 174.06593406593407, 'wrist': 128.05860805860806, 'claw': 0.5128205128205128}
         speed = 500 if slow else 1000
-        acc = 20 if slow else 40
+        acc = 10 if slow else 40
         self.move_joint('base', 166 +  np.degrees(theta0), speed=speed, acc=acc)
         self.move_joint('shoulder', 291 - np.degrees(theta1), speed=speed, acc=acc)
         self.move_joint('elbow', 92.8 - np.degrees(theta2), speed=speed, acc=acc)
-        self.move_joint('wrist', 163 - np.degrees(theta3))
+        self.move_joint('wrist', 163 - np.degrees(theta3), speed=int(speed * 1.8), acc=int(acc * 1.8))
 
     def stow(self):
         """Move the arm to a safe stowed position."""
@@ -119,7 +119,7 @@ class ArmController:
         self.move_joint('wrist', 0)
         self.move_joint('claw', 100)
 
-    def move_to_square(self, square_name, above = True, slow = False):
+    def move_to_square(self, square_name, z = 150, slow = False):
         """Move the arm to a specific chess square (e.g., 'e4')."""
         # Convert chess square to board coordinates (0-7 for x and y)
         col = ord(square_name[0]) - ord('a')  # 'a' -> 0, 'b' -> 1, ..., 'h' -> 7
@@ -129,37 +129,64 @@ class ArmController:
         # Assuming the bottom-left corner of the board is at (x=0, y=0)
         square_size_mm = 55  # adjust based on your actual board size
         arm_offset_mm = 90  # adjust if your arm's base is offset from the board's origin
-        center_offset_mm = 208
+        center_offset_mm = 211
         x = row * square_size_mm + square_size_mm / 2 + arm_offset_mm
         y = col * square_size_mm + square_size_mm / 2 - center_offset_mm
-        if above:
-            z = 150  # height above the board; adjust as needed
-        else:
-            z = 15  # height above the board; adjust as needed
 
         self.move_to_cartesian(x, y, z, slow=slow)
+        time.sleep(.11)
+
+    def wait_for_move_completion(self, timeout=10.0, poll_interval=0.1):
+        for name, sid in JOINT_IDS.items():
+            start = time.time()
+            while True:
+                moving = self.servo.IsMoving(sid)
+                if moving is None:
+                    print(f"WARNING: comm error checking {name} (id {sid})")
+                    break
+                if not moving:
+                    break
+                if time.time() - start > timeout:
+                    print(f"WARNING: {name} (id {sid}) timed out while moving")
+                    break
+                time.sleep(poll_interval)
 
     def drop(self, square_name):
         """Move to a square and open the claw to drop a piece."""
-        self.move_to_square(square_name, above=False)
-        time.sleep(2)  # wait for arm to reach position
+        for z in [150, 125, 100, 75, 50, 20]:  # move down in steps
+            self.move_to_square(square_name, z=z, slow=True)
+
+        self.wait_for_move_completion()
         self.move_joint('claw', 98)  # open claw
-        time.sleep(2)  # wait for claw to open
-        self.move_to_square(square_name, above=True)  # lift back up
-        time.sleep(2)  # wait for arm to lift
+        self.wait_for_move_completion()
+        for z in [50, 75, 100, 150]:  # move down in steps
+            self.move_to_square(square_name, z=z, slow=True)
+        self.wait_for_move_completion()
 
     def pick(self, square_name, pawn = False):
         """Move to a square and close the claw to pick up a piece."""
         self.move_joint('claw', 98)  # open claw
-        self.move_to_square(square_name, above=False, slow=True)
-        time.sleep(2)  # wait for arm to reach position
+        for z in [150, 125, 100, 75, 50, 15]:  # move down in steps
+            self.move_to_square(square_name, z=z, slow=True)
+        self.wait_for_move_completion()
         if pawn:
-            self.move_joint('claw', 75)  # close claw for pawn
+            self.move_joint('claw', 72)  # close claw for pawn
         else:
             self.move_joint('claw', 82)  # close claw for other pieces
-        time.sleep(2)  # wait for claw to close
-        self.move_to_square(square_name, above=True)  # lift back up
-        time.sleep(2)  # wait for arm to lift
+        self.wait_for_move_completion()
+        for z in [50, 75, 100, 150]:  # move down in steps
+            self.move_to_square(square_name, z=z, slow=True)
+        self.wait_for_move_completion()
+
+    def from_to(self, from_square, to_square, pawn = False):
+        """Pick up a piece from one square and drop it on another."""
+        self.move_to_square(from_square)
+        self.wait_for_move_completion()
+        self.pick(from_square, pawn=pawn)
+
+        self.move_to_square(to_square)
+        self.wait_for_move_completion()
+        self.drop(to_square)
 
 if __name__ == "__main__":
     arm = ArmController()
@@ -219,19 +246,14 @@ if __name__ == "__main__":
     # arm.move_joint('base', 194)
     # time.sleep(2)
     # arm.move_joint('base', 139.5)
-    arm.move_to_square('e5', above=True)
-    time.sleep(3)
-    arm.pick('e5', pawn=False)
-
-    arm.move_to_square('h8', above=True)
-    time.sleep(3)
-    arm.drop('h8')
-
+    arm.from_to('e7', 'h4', pawn=False)
+    arm.from_to('h4', 'e7', pawn=False)
     arm.stow()
-    for i in range(100):
-        print(arm.read_all_angles())
-        time.sleep(0.5)
-    print(arm.read_all_angles())
+
+    # for i in range(100):
+    #     print(arm.read_all_angles())
+    #     time.sleep(0.5)
+    # print(arm.read_all_angles())
 
     # print("\nCentering all joints...")
     # arm.center_all()
