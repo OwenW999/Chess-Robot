@@ -56,7 +56,7 @@ TRAVEL_Z = 155
 # beyond it, compensation grows linearly with reach. Increase SAG_GAIN if the
 # claw is still landing low/short on far squares, decrease if it overshoots high.
 SAG_REACH_THRESHOLD_MM = 250   # reach (mm) below which no compensation is applied
-SAG_GAIN_DEG_PER_MM = 0.15     # extra degrees of "up" per mm of reach past the threshold
+SAG_GAIN_DEG_PER_MM = 0.1     # extra degrees of "up" per mm of reach past the threshold
 
 # --- Safe waypoint for entering/leaving camera_clear() and stow() ---
 # The tripod sits directly above the base, and both of those poses hold the
@@ -311,7 +311,7 @@ class ArmController:
         """Move to a square and close the claw to pick up a piece."""
         self.move_joint('claw', 99)  # open claw
 
-        self.move_to_square(square_name, z=12, slow=True)
+        self.move_to_square(square_name, z=10, slow=True)
         self.wait_for_move_completion()
         if pawn:
             self.move_joint('claw', 69)  # close claw for pawn
