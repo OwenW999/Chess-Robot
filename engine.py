@@ -1,14 +1,15 @@
 """
 engine.py
 
-Thin wrapper around python-chess's Stockfish UCI interface, so main.py
+Thin wrapper around python-chess's Stockfish UCI interface, so main.py 
 doesn't need to know anything about chess.engine directly.
 """
 
 import chess
 import chess.engine
+import os
 
-DEFAULT_STOCKFISH_PATH = r"C:\Users\eweng\OneDrive\Documents\Owen\Coding\StockFish\stockfish-windows-x86-64-avx2.exe"
+DEFAULT_STOCKFISH_PATH = "C:\\Users\\eweng\\OneDrive\\Documents\\Owen\\Coding\\StockFish\\stockfish-windows-x86-64-avx2.exe"
 DEFAULT_TIME_LIMIT = 1.0  # seconds Stockfish is given to pick a move
 
 

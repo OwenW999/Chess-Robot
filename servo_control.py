@@ -56,7 +56,7 @@ TRAVEL_Z = 155
 # beyond it, compensation grows linearly with reach. Increase SAG_GAIN if the
 # claw is still landing low/short on far squares, decrease if it overshoots high.
 SAG_REACH_THRESHOLD_MM = 250   # reach (mm) below which no compensation is applied
-SAG_GAIN_DEG_PER_MM = 0.1     # extra degrees of "up" per mm of reach past the threshold
+SAG_GAIN_DEG_PER_MM = 0.004     # extra degrees of "up" per mm of reach past the threshold
 
 # --- Safe waypoint for entering/leaving camera_clear() and stow() ---
 # The tripod sits directly above the base, and both of those poses hold the
@@ -153,12 +153,12 @@ class ArmController:
         including shoulder sag compensation. Shared by move_to_cartesian and
         leave_folded_pose so both compute angles the same way."""
         theta0, theta1, theta2, theta3 = inverse_kinematics(x, y, z, geom, elbow_up=False)
-        shoulder_angle = 293.0835 - np.degrees(theta1) - self.shoulder_sag_compensation(x, y)
+        shoulder_angle = 292.8 - np.degrees(theta1) - self.shoulder_sag_compensation(x, y)
         return {
             'base': 168.5209 + np.degrees(theta0),
             'shoulder': shoulder_angle,
-            'elbow': 90.9088 - np.degrees(theta2),
-            'wrist': 162.5033 - np.degrees(theta3),
+            'elbow': 92.8 - np.degrees(theta2),
+            'wrist': 162.8 - np.degrees(theta3),
         }
 
     def move_to_cartesian(self, x, y, z, slow=False):
@@ -172,7 +172,7 @@ class ArmController:
         self.last_xyz = (x, y, z)
         self.current_pose = None
 
-    def move_joints_through_waypoint(self, waypoint_angles, final_angles, duration=1.0, waypoint_fraction=0.55):
+    def move_joints_through_waypoint(self, waypoint_angles, final_angles, duration=1.0, waypoint_fraction=0.75):
         """
         Move continuously through an intermediate joint pose to a final pose,
         without stopping. Commands the waypoint, lets the servos get most of
@@ -311,7 +311,7 @@ class ArmController:
         """Move to a square and close the claw to pick up a piece."""
         self.move_joint('claw', 99)  # open claw
 
-        self.move_to_square(square_name, z=10, slow=True)
+        self.move_to_square(square_name, z=5, slow=True)
         self.wait_for_move_completion()
         if pawn:
             self.move_joint('claw', 69)  # close claw for pawn
