@@ -1,0 +1,46 @@
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/Copying.txt[m[36m:[m[32m340[m[36m:[msource code form), and must require no special [1;31mpassword[m or key for
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/benchmark.cpp[m[36m:[m[32m393[m[36m:[m    std::string              go, [1;31mtoken[m;
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/benchmark.cpp[m[36m:[m[32m396[m[36m:[m    std::string ttSize    = (is >> [1;31mtoken[m) ? [1;31mtoken[m : "16";
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/benchmark.cpp[m[36m:[m[32m397[m[36m:[m    std::string threads   = (is >> [1;31mtoken[m) ? [1;31mtoken[m : "1";
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/benchmark.cpp[m[36m:[m[32m398[m[36m:[m    std::string limit     = (is >> [1;31mtoken[m) ? [1;31mtoken[m : "13";
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/benchmark.cpp[m[36m:[m[32m399[m[36m:[m    std::string fenFile   = (is >> [1;31mtoken[m) ? [1;31mtoken[m : "default";
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/benchmark.cpp[m[36m:[m[32m400[m[36m:[m    std::string limitType = (is >> [1;31mtoken[m) ? [1;31mtoken[m : "depth";
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/incbin/incbin.h[m[36m:[m[32m189[m[36m:[m/* On arm assemblers, `@' is used as a line comment [1;31mtoken[m */
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m54[m[36m:[musing OpenProcess[1;31mToken[m_t      = bool (*)(HANDLE, DWORD, PHANDLE);
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m56[m[36m:[musing Adjust[1;31mToken[mPrivileges_t =
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m57[m[36m:[m  bool (*)(HANDLE, BOOL, P[1;31mTOKEN[m_PRIVILEGES, DWORD, P[1;31mTOKEN[m_PRIVILEGES, PDWORD);
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m253[m[36m:[m    HANDLE hProcess[1;31mToken[m{};
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m260[m[36m:[m    // Dynamically link OpenProcess[1;31mToken[m, LookupPrivilegeValue and Adjust[1;31mToken[mPrivileges
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m267[m[36m:[m    auto OpenProcess[1;31mToken[m_f =
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m268[m[36m:[m      OpenProcess[1;31mToken[m_t((void (*)()) GetProcAddress(hAdvapi32, "OpenProcess[1;31mToken[m"));
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m269[m[36m:[m    if (!OpenProcess[1;31mToken[m_f)
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m275[m[36m:[m    auto Adjust[1;31mToken[mPrivileges_f =
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m276[m[36m:[m      Adjust[1;31mToken[mPrivileges_t((void (*)()) GetProcAddress(hAdvapi32, "Adjust[1;31mToken[mPrivileges"));
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m277[m[36m:[m    if (!Adjust[1;31mToken[mPrivileges_f)
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m282[m[36m:[m    if (!OpenProcess[1;31mToken[m_f(  // OpenProcess[1;31mToken[m()
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m283[m[36m:[m          GetCurrentProcess(), [1;31mTOKEN[m_ADJUST_PRIVILEGES | [1;31mTOKEN[m_QUERY, &hProcess[1;31mToken[m))
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m289[m[36m:[m    [1;31mTOKEN[m_PRIVILEGES tp{};
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m290[m[36m:[m    [1;31mTOKEN[m_PRIVILEGES prevTp{};
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m297[m[36m:[m    // Try to enable SeLockMemoryPrivilege. Note that even if Adjust[1;31mToken[mPrivileges()
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m301[m[36m:[m    if (!Adjust[1;31mToken[mPrivileges_f(hProcess[1;31mToken[m, FALSE, &tp, sizeof([1;31mTOKEN[m_PRIVILEGES), &prevTp,
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m309[m[36m:[m    Adjust[1;31mToken[mPrivileges_f(hProcess[1;31mToken[m, FALSE, &prevTp, 0, nullptr, nullptr);
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/memory.h[m[36m:[m[32m311[m[36m:[m    CloseHandle(hProcess[1;31mToken[m);
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m480[m[36m:[mclass NumaReplicatedAccess[1;31mToken[m {
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m482[m[36m:[m    NumaReplicatedAccess[1;31mToken[m() :
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m485[m[36m:[m    explicit NumaReplicatedAccess[1;31mToken[m(NumaIndex idx) :
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m831[m[36m:[m    NumaReplicatedAccess[1;31mToken[m bind_current_thread_to_numa_node(NumaIndex n) const {
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m950[m[36m:[m        return NumaReplicatedAccess[1;31mToken[m(n);
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1344[m[36m:[m    const T& operator[](NumaReplicatedAccess[1;31mToken[m [1;31mtoken[m) const {
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1345[m[36m:[m        assert([1;31mtoken[m.get_numa_index() < instances.size());
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1346[m[36m:[m        return *(instances[[1;31mtoken[m.get_numa_index()]);
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1430[m[36m:[m    const T& operator[](NumaReplicatedAccess[1;31mToken[m [1;31mtoken[m) const {
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1431[m[36m:[m        assert([1;31mtoken[m.get_numa_index() < instances.size());
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1432[m[36m:[m        ensure_present([1;31mtoken[m.get_numa_index());
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1433[m[36m:[m        return *(instances[[1;31mtoken[m.get_numa_index()]);
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1540[m[36m:[m    const T& operator[](NumaReplicatedAccess[1;31mToken[m [1;31mtoken[m) const {
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1541[m[36m:[m        assert([1;31mtoken[m.get_numa_index() < instances.size());
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1542[m[36m:[m        ensure_present([1;31mtoken[m.get_numa_index());
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/numa.h[m[36m:[m[32m1543[m[36m:[m        return *(instances[[1;31mtoken[m.get_numa_index()]);
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/position.cpp[m[36m:[m[32m203[m[36m:[m    unsigned char      col, row, [1;31mtoken[m;
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/stockfish/src/position.cpp[m[36m:[m[32m215[m[36m:[m    while ((ss >> [1;31mtoken[m) && !isspace([1;31mtoken[m))
+[35m328c28bb2b2778b5a3b60ef8f40c9522033d00f0:StockFish/s
